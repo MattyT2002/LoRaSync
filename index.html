@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LoRa Sync</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: left;
+            margin-left: 20px;
+        }
+
+        #status {
+            margin-top: 10px;
+        }
+
+        #network {
+            width: 50%;
+            height: 500px;
+            border: 1px solid black;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            margin-left: auto;
+        }
+    </style>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+</head>
+
+<body>
+    <h1>LoRa Sync</h1>
+    <h2>By Matthew Tonge</h2>
+
+    <!-- Theme Selection -->
+    <select id="displayMode">
+        <option value="light">Light Mode</option>
+        <option value="dark">Dark Mode</option>
+    </select>
+    <br>
+
+    <!-- Device Selection -->
+    <label for="deviceType">Select Device:</label>
+    <select id="deviceType">
+        <option value="arduino">Arduino Nano 33 BLE</option>
+        <option value="heltec">Heltec LoRa 32</option>
+    </select>
+    <br>
+
+    <!-- Buttons -->
+    <button id="connect">Connect to Device</button>
+    <textarea id="htmlMessage" placeholder="Enter HTML message"></textarea>
+    <button id="send">Send Message</button>
+
+    <p id="status">Status: Disconnected</p>
+    <div id="output"></div>
+
+    <!-- Network Graph -->
+    <div id="network"></div>
+
+    <script>
+        let bleServer, bleService, bleCharacteristic;
+        let network;
+
+        // UUIDs for BLE communication
+        const ARDUINO_SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0";
+        const ARDUINO_CHARACTERISTIC_UUID = "abcdef01-1234-5678-1234-56789abcdef0";
+        const HELTEC_SERVICE_UUID = "87654321-4321-6789-4321-098765fedcba";
+        const HELTEC_CHARACTERISTIC_UUID = "fedcba98-4321-6789-4321-098765fedcba";
+
+        document.getElementById("connect").addEventListener("click", async () => {
+            let selectedDevice = document.getElementById("deviceType").value;
+            let serviceUUID, characteristicUUID;
+
+            if (selectedDevice === "arduino") {
+                serviceUUID = ARDUINO_SERVICE_UUID;
+                characteristicUUID = ARDUINO_CHARACTERISTIC_UUID;
+            } else if (selectedDevice === "heltec") {
+                serviceUUID = HELTEC_SERVICE_UUID;
+                characteristicUUID = HELTEC_CHARACTERISTIC_UUID;
+            } else {
+                alert("Please select a device!");
+                return;
+            }
+
+            try {
+                console.log("Requesting Bluetooth Device...");
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: [serviceUUID]
+                });
+
+                console.log("Connecting to GATT Server...");
+                bleServer = await device.gatt.connect();
+
+                console.log("Getting Primary Service...");
+                bleService = await bleServer.getPrimaryService(serviceUUID);
+
+                console.log("Getting Characteristic...");
+                bleCharacteristic = await bleService.getCharacteristic(characteristicUUID);
+
+                document.getElementById("status").textContent = `Status: Connected to ${selectedDevice.toUpperCase()}`;
+                listenForUpdates();
+            } catch (error) {
+                console.error("Connection failed!", error);
+                document.getElementById("status").textContent = "Status: Connection Failed";
+            }
+        });
+
+        document.getElementById("send").addEventListener("click", async () => {
+            if (!bleCharacteristic) {
+                alert("Not connected to a device");
+                return;
+            }
+            const message = document.getElementById("htmlMessage").value;
+            let timestamp = new Date().toLocaleTimeString();
+            const messageWithTimestamp = `${message} (Sent at: ${timestamp})`;
+
+            let encoder = new TextEncoder();
+            await bleCharacteristic.writeValue(encoder.encode(messageWithTimestamp));
+
+            console.log(`[${timestamp}] Sent message:`, messageWithTimestamp);
+            document.getElementById("output").innerHTML += `<p><strong>[${timestamp}] Sent:</strong> ${messageWithTimestamp}</p>`;
+        });
+
+        async function listenForUpdates() {
+            try {
+                console.log("Starting notifications...");
+                await bleCharacteristic.startNotifications();
+                console.log("Notifications started!");
+                bleCharacteristic.addEventListener("characteristicvaluechanged", handleNotification);
+                console.log("Listening for incoming messages...");
+            } catch (error) {
+                console.error("Error enabling notifications:", error);
+            }
+        }
+
+        function handleNotification(event) {
+            let decoder = new TextDecoder();
+            let receivedMessage = decoder.decode(event.target.value);
+            let timestamp = new Date().toLocaleTimeString();
+
+            console.log(`[${timestamp}] Notification received:`, receivedMessage);
+            document.getElementById("output").innerHTML += `<p><strong>[${timestamp}] Received:</strong> ${receivedMessage}</p>`;
+
+            try {
+                let nodeData = JSON.parse(receivedMessage);
+                updateNetworkGraph(nodeData);
+            } catch (error) {
+                console.error("Error parsing node data:", error);
+            }
+        }
+
+        function updateNetworkGraph(nodeData) {
+            let nodes = [];
+            let edges = [];
+
+            nodeData.nodes.forEach(node => {
+                nodes.push({ id: node.id, label: `${node.id}\nSNR: ${node.snr}` });
+            });
+
+            nodeData.connections.forEach(link => {
+                edges.push({ from: link.from, to: link.to, label: `SNR: ${link.snr}` });
+            });
+
+            let container = document.getElementById("network");
+            let data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+            let options = { edges: { arrows: "to" }, physics: { enabled: false } };
+
+            if (!network) {
+                network = new vis.Network(container, data, options);
+            } else {
+                network.setData(data);
+            }
+        }
+
+        document.getElementById("displayMode").addEventListener("change", (event) => {
+            if (event.target.value === "dark") {
+                document.body.style.backgroundColor = "black";
+                document.body.style.color = "white";
+            } else {
+                document.body.style.backgroundColor = "white";
+                document.body.style.color = "black";
+            }
+        });
+
+    </script>
+</body>
+
+</html>
