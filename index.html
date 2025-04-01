@@ -23,6 +23,15 @@
             margin-top: 20px;
             margin-bottom: 20px;
             margin-left: auto;
+
+        }
+
+        .box {
+            border: 2px solid black;
+            padding: 2px;
+            display: inline-block;
+            border-radius: 5px;
+            margin-top: 2px;
         }
     </style>
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
@@ -45,6 +54,15 @@
         <option value="arduino">Arduino Nano 33 BLE</option>
         <option value="heltec">Heltec LoRa 32</option>
     </select>
+    <br>
+
+    <!-- Radio Button Selection Box -->
+    <div class="box">
+        <label for="radio">Precedence:</label><br>
+        <label><input type="radio" name="Precedence" value="1"> Routine</label><br>
+        <label><input type="radio" name="Precedence" value="2"> Priority</label><br>
+        <label><input type="radio" name="Precedence" value="3"> Immediate</label>
+    </div>
     <br>
 
     <!-- Buttons -->
