@@ -24,6 +24,7 @@
             margin-bottom: 20px;
             margin-left: auto;
 
+
         }
 
         .messageHeader {
@@ -66,7 +67,7 @@
         <div class="box">
             <label for="number">Number:</label><br>
             <textarea id="number" placeholder="Enter Number"></textarea><br>
-            
+
         </div>
 
         <!-- Precedence Selection Box -->
@@ -88,7 +89,42 @@
             <label for="Place">Place of Origin:</label><br>
             <textarea id="Place" placeholder="Enter Place of Origin"></textarea><br>
         </div>
+    </div>
+    <div class="messageHeader">
+        <!-- Destination Node S</div>election Box -->
+        <div class="box">
+            <label for="destinationNode">Destination Node:</label><br>
+            <select id="destinationNode">
+                <option value="" disabled selected>Select a node</option>
+            </select>
+        </div>
 
+        <script>
+            function updateDestinationNodeList(data, selfNodeId) {
+                const destinationNodeSelect = document.getElementById("destinationNode");
+                destinationNodeSelect.innerHTML = '<option value="" disabled selected>Select a node</option>'; // Reset options
+
+                data.nodes.forEach(node => {
+                    if (node.id !== selfNodeId) { // Exclude self node
+                        const option = document.createElement("option");
+                        option.value = node.id;
+                        option.textContent = node.id;
+                        destinationNodeSelect.appendChild(option);
+                    }
+                });
+            }
+        </script>
+        <!-- To Selection Box -->
+        <div class="box">
+            <label for="to">To:</label><br>
+            <textarea id="to" placeholder="Enter recipient"></textarea><br>
+        </div>
+
+        <!-- From Selection Box -->
+        <div class="box">
+            <label for="from">From:</label><br>
+            <textarea id="from" placeholder="Enter sender"></textarea><br>
+        </div>
     </div>
     <br>
 
@@ -96,6 +132,7 @@
     <button id="connect">Connect to Device</button>
     <textarea id="htmlMessage" placeholder="Enter HTML message"></textarea>
     <button id="send">Send Message</button>
+    <button id="loadTestData">Load Test Data</button> <!-- New button for test data -->
 
     <p id="status">Status: Disconnected</p>
     <div id="output"></div>
@@ -167,10 +204,10 @@
                 return;
             }
             let timestamp = new Date().toLocaleTimeString();
-            let datestamp = new Date().toLocaleDateString('en-GB'); 
+            let datestamp = new Date().toLocaleDateString('en-GB');
             let messageHeader = ` Number |${number}| Place |${place}| Station |${station}| Precedence |${precedence}|`;
             const messageWithHeader = `${messageHeader}\nMessage|<b>${message}</b>|\n[${timestamp} ${datestamp}]`;
-            
+
             let encoder = new TextEncoder();
             await bleCharacteristic.writeValue(encoder.encode(messageWithHeader));
 
@@ -190,44 +227,79 @@
             }
         }
 
+        let receivedData = ""; // Buffer for accumulating message data
+
         function handleNotification(event) {
             let decoder = new TextDecoder();
-            let receivedMessage = decoder.decode(event.target.value);
-            let timestamp = new Date().toLocaleTimeString();
+            let receivedMessage = decoder.decode(event.target.value); // Decode the message
+            let timestamp = new Date().toLocaleTimeString(); // Get the timestamp for logging
 
+            // Log the received message to the console and display it on the page
             console.log(`[${timestamp}] Notification received:`, receivedMessage);
             document.getElementById("output").innerHTML += `<p><strong>[${timestamp}] Received:</strong> ${receivedMessage}</p>`;
 
+            // Accumulate the received message
+            receivedData += receivedMessage;
+
+            // Try parsing the accumulated message as JSON
             try {
-                let nodeData = JSON.parse(receivedMessage);
-                updateNetworkGraph(nodeData);
+                let nodeData = JSON.parse(receivedData);
+                console.log("Node data parsed:", nodeData);
+                updateNetworkGraph(nodeData); // Update the network graph with the received data
+
+                // Reset the buffer after successful parsing
+                receivedData = "";
             } catch (error) {
+                // If JSON is not complete, just log an error and wait for more data
                 console.error("Error parsing node data:", error);
             }
         }
 
-        function updateNetworkGraph(nodeData) {
-            let nodes = [];
-            let edges = [];
+        function updateNetworkGraph(data) {
+            let nodes = new vis.DataSet(data.nodes.map(node => ({
+                id: node.id,
+                label: node.id
+            })));
 
-            nodeData.nodes.forEach(node => {
-                nodes.push({ id: node.id, label: `${node.id}\nSNR: ${node.snr}` });
-            });
-
-            nodeData.connections.forEach(link => {
-                edges.push({ from: link.from, to: link.to, label: `SNR: ${link.snr}` });
-            });
+            let edges = new vis.DataSet(data.connections.map(link => ({
+                from: link.from,
+                to: link.to,
+                label: `SNR: ${link.snr}`,
+                width: Math.max(1, link.snr / 2)  // Make links thicker for stronger SNR
+            })));
 
             let container = document.getElementById("network");
-            let data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
-            let options = { edges: { arrows: "to" }, physics: { enabled: false } };
 
-            if (!network) {
-                network = new vis.Network(container, data, options);
-            } else {
-                network.setData(data);
-            }
+            let options = {
+                edges: {
+                    arrows: { to: { enabled: false } }, // No directional arrows
+                    color: { color: "#848484" }, // Default link color
+                    smooth: true
+                },
+                physics: { enabled: true } // Enable dynamic positioning
+            };
+
+            let network = new vis.Network(container, { nodes, edges }, options);
         }
+
+        document.getElementById("loadTestData").addEventListener("click", () => {
+            const testData = {
+                nodes: [
+                    { id: "Node1" },
+                    { id: "Node2" },
+                    { id: "Node3" },
+                    { id: "Node4" }
+                ],
+                connections: [
+                    { from: "Node1", to: "Node2", snr: 10 },
+                    { from: "Node2", to: "Node3", snr: 15 },
+                    { from: "Node3", to: "Node4", snr: 20 },
+                    { from: "Node4", to: "Node1", snr: 5 }
+                ]
+            };
+
+            updateNetworkGraph(testData); // Use the existing function to display the test data
+        });
 
         document.getElementById("displayMode").addEventListener("change", (event) => {
             if (event.target.value === "dark") {
