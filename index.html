@@ -198,6 +198,8 @@
             const number = document.getElementById("number").value;
             const place = document.getElementById("Place").value;
             const station = document.getElementById("station").value;
+            const to = document.getElementById("to").value;
+            const from = document.getElementById("from").value;
             const precedence = document.querySelector('input[name="Precedence"]:checked')?.value || "1";
             if (!message || !number || !place || !station || !precedence) {
                 alert("Please fill in all fields");
@@ -205,8 +207,8 @@
             }
             let timestamp = new Date().toLocaleTimeString();
             let datestamp = new Date().toLocaleDateString('en-GB');
-            let messageHeader = ` Number |${number}| Place |${place}| Station |${station}| Precedence |${precedence}|`;
-            const messageWithHeader = `${messageHeader}\nMessage|<b>${message}</b>|\n[${timestamp} ${datestamp}]`;
+            let messageHeader = ` Number| ${number} |Place| ${place} |Station| ${station} |Precedence| ${precedence} |`;
+            const messageWithHeader = `${messageHeader}To| ${to} |Message|<b>${message}</b>|From| ${from} |[${timestamp} ${datestamp}]`;
 
             let encoder = new TextEncoder();
             await bleCharacteristic.writeValue(encoder.encode(messageWithHeader));
