@@ -84,25 +84,27 @@
             border-radius: 50%;
         }
 
-        input:checked + .slider {
+        input:checked+.slider {
             background-color: #2196F3;
         }
 
-        input:checked + .slider:before {
+        input:checked+.slider:before {
             transform: translateX(26px);
         }
 
-        #sentMessages, #receivedMessages {
+        #sentMessages,
+        #receivedMessages {
             margin-top: 10px;
         }
-
     </style>
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 </head>
 
 <body>
     <h1>LoRa Sync</h1>
-    <h2>By Matthew Tonge</h2>
+    <h2>By Matthew Tonge</h2> 
+    <!-- Network Graph -->
+    <div id="network"></div>
 
     <!-- Theme Selection -->
     <select id="displayMode">
@@ -186,8 +188,7 @@
     <div id="sentMessages"></div>
     <div id="receivedMessages" style="display:none;"></div>
 
-    <!-- Network Graph -->
-    <div id="network"></div>
+   
 
     <script>
         let bleServer, bleService, bleCharacteristic;
@@ -268,52 +269,80 @@
                 console.error("Error enabling notifications:", error);
             }
         }
+        let partialData = "";
 
-        function handleNotification(event) {
-            let decoder = new TextDecoder();
-            let receivedMessage = decoder.decode(event.target.value);
-            let timestamp = new Date().toLocaleTimeString();
+function handleNotification(event) {
+    let decoder = new TextDecoder();
+    let chunk = decoder.decode(event.target.value);
+    partialData += chunk;  // append chunk
 
-            receivedData += receivedMessage;
+    // Log the data to check if it's coming through correctly
+    console.log("Received Chunk:", chunk);
+    console.log("Partial Data:", partialData);
 
-            try {
-                let nodeData = JSON.parse(receivedData);
-                updateNetworkGraph(nodeData);
-                receivedData = "";
-            } catch (error) {
-                console.error("Waiting for full JSON data...");
-            }
+    // Try to parse the full data if it's complete
+    try {
+        let nodeData = JSON.parse(partialData);
+        console.log("Parsed Node Data:", nodeData);
 
-            document.getElementById("receivedMessages").innerHTML += `<p><strong>[${timestamp}] Received:</strong> ${receivedMessage}</p>`;
-        }
+        // Update the network graph with the parsed data
+        updateNetworkGraph(nodeData);
 
-        function updateNetworkGraph(data) {
-            let nodes = new vis.DataSet(data.nodes.map(node => ({
-                id: node.id,
-                label: node.id
-            })));
+        // Clear the partial data after successful parsing
+        partialData = ""; 
+    } catch (error) {
+        // Still waiting for more data to form a complete JSON object
+        console.log("Waiting for full JSON data...");
+    }
 
-            let edges = new vis.DataSet(data.connections.map(link => ({
-                from: link.from,
-                to: link.to,
-                label: `SNR: ${link.snr}`,
-                width: Math.max(1, link.snr / 2)
-            })));
+    let timestamp = new Date().toLocaleTimeString();
+    document.getElementById("receivedMessages").innerHTML += `<p><strong>[${timestamp}] Received Chunk:</strong> ${chunk}</p>`;
+}
 
-            let container = document.getElementById("network");
-            let options = {
-                edges: {
-                    arrows: { to: { enabled: false } },
-                    color: { color: "#848484" },
-                    smooth: true
-                },
-                physics: { enabled: true }
-            };
+function updateNetworkGraph(data) {
+    // Ensure the data is in the correct format
+    console.log("Updating Network Graph with data:", data);
 
-            network = new vis.Network(container, { nodes, edges }, options);
+    // Create nodes from the received data
+    let nodes = new vis.DataSet(data.nodes.map(node => ({
+        id: node.id,
+        label: node.label,
+        title: node.title // Add titles if neeF=ded
+    })));
 
-            updateDestinationNodeList(data, ""); // call destination node list update
-        }
+    // Create edges from the received data
+    let edges = new vis.DataSet(data.edges.map(link => ({
+        from: link.from,
+        to: link.to,
+        label: link.label,
+        width: Math.max(1, link.snr / 2) // Optional: Adjust width based on SNR
+    })));
+
+    // Ensure the graph container exists
+    let container = document.getElementById("network");
+
+    // Check if the network instance exists
+    if (!network) {
+        // If not, create a new network instance
+        let options = {
+            edges: {
+                arrows: { to: { enabled: false } },
+                color: { color: "#848484" },
+                smooth: true
+            },
+            physics: { enabled: true }
+        };
+
+        network = new vis.Network(container, { nodes, edges }, options);
+    } else {
+        // If network instance already exists, just update the data
+        network.setData({ nodes, edges });
+    }
+
+    // Update the destination node list
+    updateDestinationNodeList(data, ""); 
+}
+
 
         function updateDestinationNodeList(data, selfNodeId) {
             const destinationNodeSelect = document.getElementById("destinationNode");
@@ -371,4 +400,4 @@
     </script>
 </body>
 
-</html>
+</html> 
