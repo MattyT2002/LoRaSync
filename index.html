@@ -23,8 +23,6 @@
             margin-top: 20px;
             margin-bottom: 20px;
             margin-left: auto;
-
-
         }
 
         .messageHeader {
@@ -39,6 +37,65 @@
             background-color: lightblue;
             border: 2px solid black;
         }
+
+        /* Toggle Switch Style */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+            margin-left: 10px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        #sentMessages, #receivedMessages {
+            margin-top: 10px;
+        }
+
     </style>
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 </head>
@@ -61,16 +118,14 @@
         <option value="heltec">Heltec LoRa 32</option>
     </select>
     <br>
+
     <!-- Message Header Container -->
     <div class="messageHeader">
-        <!-- Place of Origin Selection Box -->
         <div class="box">
             <label for="number">Number:</label><br>
             <textarea id="number" placeholder="Enter Number"></textarea><br>
-
         </div>
 
-        <!-- Precedence Selection Box -->
         <div class="box">
             <label for="radio">Precedence:</label><br>
             <label><input type="radio" name="Precedence" value="1"> Routine (1)</label><br>
@@ -78,20 +133,18 @@
             <label><input type="radio" name="Precedence" value="3"> Immediate (3)</label>
         </div>
 
-        <!-- Station of Origin Selection Box -->
         <div class="box">
             <label for="station">Station of Origin:</label><br>
             <textarea id="station" placeholder="Enter Station of Origin"></textarea><br>
         </div>
 
-        <!-- Place of Origin Selection Box -->
         <div class="box">
             <label for="Place">Place of Origin:</label><br>
             <textarea id="Place" placeholder="Enter Place of Origin"></textarea><br>
         </div>
     </div>
+
     <div class="messageHeader">
-        <!-- Destination Node S</div>election Box -->
         <div class="box">
             <label for="destinationNode">Destination Node:</label><br>
             <select id="destinationNode">
@@ -99,28 +152,11 @@
             </select>
         </div>
 
-        <script>
-            function updateDestinationNodeList(data, selfNodeId) {
-                const destinationNodeSelect = document.getElementById("destinationNode");
-                destinationNodeSelect.innerHTML = '<option value="" disabled selected>Select a node</option>'; // Reset options
-
-                data.nodes.forEach(node => {
-                    if (node.id !== selfNodeId) { // Exclude self node
-                        const option = document.createElement("option");
-                        option.value = node.id;
-                        option.textContent = node.id;
-                        destinationNodeSelect.appendChild(option);
-                    }
-                });
-            }
-        </script>
-        <!-- To Selection Box -->
         <div class="box">
             <label for="to">To:</label><br>
             <textarea id="to" placeholder="Enter recipient"></textarea><br>
         </div>
 
-        <!-- From Selection Box -->
         <div class="box">
             <label for="from">From:</label><br>
             <textarea id="from" placeholder="Enter sender"></textarea><br>
@@ -130,12 +166,25 @@
 
     <!-- Buttons -->
     <button id="connect">Connect to Device</button>
-    <textarea id="htmlMessage" placeholder="Enter HTML message"></textarea>
+    <textarea id="htmlMessage" placeholder="Enter HTML message" rows="10" cols="70"></textarea>
     <button id="send">Send Message</button>
-    <button id="loadTestData">Load Test Data</button> <!-- New button for test data -->
+    <button id="loadTestData">Load Test Data</button>
 
     <p id="status">Status: Disconnected</p>
-    <div id="output"></div>
+
+    <!-- Toggle Switch -->
+    <div class="toggle-container">
+        <span>Show Sent</span>
+        <label class="switch">
+            <input type="checkbox" id="toggleMessages">
+            <span class="slider"></span>
+        </label>
+        <span>Show Received</span>
+    </div>
+
+    <!-- Output Areas -->
+    <div id="sentMessages"></div>
+    <div id="receivedMessages" style="display:none;"></div>
 
     <!-- Network Graph -->
     <div id="network"></div>
@@ -143,8 +192,8 @@
     <script>
         let bleServer, bleService, bleCharacteristic;
         let network;
+        let receivedData = "";
 
-        // UUIDs for BLE communication
         const ARDUINO_SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0";
         const ARDUINO_CHARACTERISTIC_UUID = "abcdef01-1234-5678-1234-56789abcdef0";
         const HELTEC_SERVICE_UUID = "87654321-4321-6789-4321-098765fedcba";
@@ -166,19 +215,13 @@
             }
 
             try {
-                console.log("Requesting Bluetooth Device...");
                 const device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: [serviceUUID]
                 });
 
-                console.log("Connecting to GATT Server...");
                 bleServer = await device.gatt.connect();
-
-                console.log("Getting Primary Service...");
                 bleService = await bleServer.getPrimaryService(serviceUUID);
-
-                console.log("Getting Characteristic...");
                 bleCharacteristic = await bleService.getCharacteristic(characteristicUUID);
 
                 document.getElementById("status").textContent = `Status: Connected to ${selectedDevice.toUpperCase()}`;
@@ -201,60 +244,47 @@
             const to = document.getElementById("to").value;
             const from = document.getElementById("from").value;
             const precedence = document.querySelector('input[name="Precedence"]:checked')?.value || "1";
-            if (!message || !number || !place || !station || !precedence) {
+            const destinationNode = document.getElementById("destinationNode").value;
+            if (!message || !number || !place || !station) {
                 alert("Please fill in all fields");
                 return;
             }
             let timestamp = new Date().toLocaleTimeString();
             let datestamp = new Date().toLocaleDateString('en-GB');
             let messageHeader = ` Number| ${number} |Place| ${place} |Station| ${station} |Precedence| ${precedence} |`;
-            const messageWithHeader = `${messageHeader}To| ${to} |Message|<b>${message}</b>|From| ${from} |[${timestamp} ${datestamp}]`;
+            const messageWithHeader = `${destinationNode}|${to}|Message|<b>${message}</b>|From|${from}|[${timestamp} ${datestamp}]|${messageHeader}`;
 
             let encoder = new TextEncoder();
             await bleCharacteristic.writeValue(encoder.encode(messageWithHeader));
 
-            console.log(`[${timestamp}] Sent message:`, messageWithHeader);
-            document.getElementById("output").innerHTML += `<p><strong>[${timestamp}] Sent:</strong> ${messageWithHeader}</p>`;
+            document.getElementById("sentMessages").innerHTML += `<p><strong>[${timestamp}] Sent:</strong> ${messageWithHeader}</p>`;
         });
 
         async function listenForUpdates() {
             try {
-                console.log("Starting notifications...");
                 await bleCharacteristic.startNotifications();
-                console.log("Notifications started!");
                 bleCharacteristic.addEventListener("characteristicvaluechanged", handleNotification);
-                console.log("Listening for incoming messages...");
             } catch (error) {
                 console.error("Error enabling notifications:", error);
             }
         }
 
-        let receivedData = ""; // Buffer for accumulating message data
-
         function handleNotification(event) {
             let decoder = new TextDecoder();
-            let receivedMessage = decoder.decode(event.target.value); // Decode the message
-            let timestamp = new Date().toLocaleTimeString(); // Get the timestamp for logging
+            let receivedMessage = decoder.decode(event.target.value);
+            let timestamp = new Date().toLocaleTimeString();
 
-            // Log the received message to the console and display it on the page
-            console.log(`[${timestamp}] Notification received:`, receivedMessage);
-            document.getElementById("output").innerHTML += `<p><strong>[${timestamp}] Received:</strong> ${receivedMessage}</p>`;
-
-            // Accumulate the received message
             receivedData += receivedMessage;
 
-            // Try parsing the accumulated message as JSON
             try {
                 let nodeData = JSON.parse(receivedData);
-                console.log("Node data parsed:", nodeData);
-                updateNetworkGraph(nodeData); // Update the network graph with the received data
-
-                // Reset the buffer after successful parsing
+                updateNetworkGraph(nodeData);
                 receivedData = "";
             } catch (error) {
-                // If JSON is not complete, just log an error and wait for more data
-                console.error("Error parsing node data:", error);
+                console.error("Waiting for full JSON data...");
             }
+
+            document.getElementById("receivedMessages").innerHTML += `<p><strong>[${timestamp}] Received:</strong> ${receivedMessage}</p>`;
         }
 
         function updateNetworkGraph(data) {
@@ -267,21 +297,35 @@
                 from: link.from,
                 to: link.to,
                 label: `SNR: ${link.snr}`,
-                width: Math.max(1, link.snr / 2)  // Make links thicker for stronger SNR
+                width: Math.max(1, link.snr / 2)
             })));
 
             let container = document.getElementById("network");
-
             let options = {
                 edges: {
-                    arrows: { to: { enabled: false } }, // No directional arrows
-                    color: { color: "#848484" }, // Default link color
+                    arrows: { to: { enabled: false } },
+                    color: { color: "#848484" },
                     smooth: true
                 },
-                physics: { enabled: true } // Enable dynamic positioning
+                physics: { enabled: true }
             };
 
-            let network = new vis.Network(container, { nodes, edges }, options);
+            network = new vis.Network(container, { nodes, edges }, options);
+
+            updateDestinationNodeList(data, ""); // call destination node list update
+        }
+
+        function updateDestinationNodeList(data, selfNodeId) {
+            const destinationNodeSelect = document.getElementById("destinationNode");
+            destinationNodeSelect.innerHTML = '<option value="" disabled selected>Select a node</option>';
+            data.nodes.forEach(node => {
+                if (node.id !== selfNodeId) {
+                    const option = document.createElement("option");
+                    option.value = node.id;
+                    option.textContent = node.id;
+                    destinationNodeSelect.appendChild(option);
+                }
+            });
         }
 
         document.getElementById("loadTestData").addEventListener("click", () => {
@@ -300,7 +344,7 @@
                 ]
             };
 
-            updateNetworkGraph(testData); // Use the existing function to display the test data
+            updateNetworkGraph(testData);
         });
 
         document.getElementById("displayMode").addEventListener("change", (event) => {
@@ -310,6 +354,17 @@
             } else {
                 document.body.style.backgroundColor = "white";
                 document.body.style.color = "black";
+            }
+        });
+
+        // Toggle Sent/Received view
+        document.getElementById("toggleMessages").addEventListener("change", function () {
+            if (this.checked) {
+                document.getElementById("sentMessages").style.display = "none";
+                document.getElementById("receivedMessages").style.display = "block";
+            } else {
+                document.getElementById("sentMessages").style.display = "block";
+                document.getElementById("receivedMessages").style.display = "none";
             }
         });
 
