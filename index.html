@@ -246,10 +246,10 @@
             const from = document.getElementById("from").value;
             const precedence = document.querySelector('input[name="Precedence"]:checked')?.value || "1";
             const destinationNode = document.getElementById("destinationNode").value;
-            if (!message || !number || !place || !station) {
+            /*if (!message || !number || !place || !station) {
                 alert("Please fill in all fields");
                 return;
-            }
+            }*/
             let timestamp = new Date().toLocaleTimeString();
             let datestamp = new Date().toLocaleDateString('en-GB');
             let messageHeader = ` Number| ${number} |Place| ${place} |Station| ${station} |Precedence| ${precedence} |`;
