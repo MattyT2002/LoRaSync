@@ -258,7 +258,8 @@
             let encoder = new TextEncoder();
             await bleCharacteristic.writeValue(encoder.encode(messageWithHeader));
 
-            document.getElementById("sentMessages").innerHTML += `<p><strong>[${timestamp}] Sent:</strong> ${messageWithHeader}</p>`;
+            document.getElementById("sentMessages").innerHTML = `<p><strong>[${timestamp}] Sent:</strong> ${message}</p>` + document.getElementById("sentMessages").innerHTML;
+
         });
 
         async function listenForUpdates() {
@@ -271,33 +272,37 @@
         }
         let partialData = "";
 
-function handleNotification(event) {
+        function handleNotification(event) {
     let decoder = new TextDecoder();
     let chunk = decoder.decode(event.target.value);
-    partialData += chunk;  // append chunk
+    partialData += chunk;
 
-    // Log the data to check if it's coming through correctly
     console.log("Received Chunk:", chunk);
-    console.log("Partial Data:", partialData);
 
-    // Try to parse the full data if it's complete
     try {
+        // Try to parse the accumulated string
         let nodeData = JSON.parse(partialData);
-        console.log("Parsed Node Data:", nodeData);
 
-        // Update the network graph with the parsed data
-        updateNetworkGraph(nodeData);
+        // Validate structure
+        if (nodeData.nodes && Array.isArray(nodeData.nodes) &&
+            nodeData.edges && Array.isArray(nodeData.edges)) {
 
-        // Clear the partial data after successful parsing
-        partialData = ""; 
+            console.log("Valid JSON received:", nodeData);
+            updateNetworkGraph(nodeData);
+            partialData = "";  // Clear only after successful update
+        } else {
+            console.warn("JSON parsed but structure is invalid");
+        }
     } catch (error) {
-        // Still waiting for more data to form a complete JSON object
-        console.log("Waiting for full JSON data...");
+        // JSON still incomplete
+        console.log("Incomplete JSON, waiting for more data...");
     }
 
     let timestamp = new Date().toLocaleTimeString();
-    document.getElementById("receivedMessages").innerHTML += `<p><strong>[${timestamp}] Received Chunk:</strong> ${chunk}</p>`;
+    document.getElementById("receivedMessages").innerHTML = `<p><strong>[${timestamp}] Received Chunk:</strong> ${chunk}</p>` + document.getElementById("receivedMessages").innerHTML;
+
 }
+
 
 function updateNetworkGraph(data) {
     // Ensure the data is in the correct format
@@ -321,23 +326,24 @@ function updateNetworkGraph(data) {
     // Ensure the graph container exists
     let container = document.getElementById("network");
 
-    // Check if the network instance exists
     if (!network) {
-        // If not, create a new network instance
-        let options = {
-            edges: {
-                arrows: { to: { enabled: false } },
-                color: { color: "#848484" },
-                smooth: true
-            },
-            physics: { enabled: true }
-        };
+    let options = {
+        edges: {
+            arrows: { to: { enabled: false } },
+            color: { color: "#848484" },
+            smooth: true
+        },
+        physics: { enabled: true }
+    };
+    network = new vis.Network(container, { nodes, edges }, options);
+} else {
+    // Update the datasets without resetting the network
+    network.body.data.nodes.clear();
+    network.body.data.edges.clear();
+    network.body.data.nodes.add(data.nodes);
+    network.body.data.edges.add(data.edges);
+}
 
-        network = new vis.Network(container, { nodes, edges }, options);
-    } else {
-        // If network instance already exists, just update the data
-        network.setData({ nodes, edges });
-    }
 
     // Update the destination node list
     updateDestinationNodeList(data, ""); 
@@ -365,7 +371,7 @@ function updateNetworkGraph(data) {
                     { id: "Node3" },
                     { id: "Node4" }
                 ],
-                connections: [
+                edges: [
                     { from: "Node1", to: "Node2", snr: 10 },
                     { from: "Node2", to: "Node3", snr: 15 },
                     { from: "Node3", to: "Node4", snr: 20 },
