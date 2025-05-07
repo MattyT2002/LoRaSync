@@ -102,7 +102,7 @@
 
 <body>
     <h1>LoRa Sync</h1>
-    <h2>By Matthew Tonge</h2> 
+    <h2>By Matthew Tonge</h2>
     <!-- Network Graph -->
     <div id="network"></div>
 
@@ -188,7 +188,7 @@
     <div id="sentMessages"></div>
     <div id="receivedMessages" style="display:none;"></div>
 
-   
+
 
     <script>
         let bleServer, bleService, bleCharacteristic;
@@ -258,9 +258,10 @@
             let encoder = new TextEncoder();
             await bleCharacteristic.writeValue(encoder.encode(messageWithHeader));
 
-            document.getElementById("sentMessages").innerHTML = `<p><strong>[${timestamp}] Sent:</strong> ${message}</p>` + document.getElementById("sentMessages").innerHTML;
-
+            // Prepend the new message at the top of the sent messages section
+            document.getElementById("sentMessages").innerHTML = `<p><strong>[${timestamp}] Sent:</strong> ${messageWithHeader}</p>` + document.getElementById("sentMessages").innerHTML;
         });
+
 
         async function listenForUpdates() {
             try {
@@ -275,79 +276,76 @@
         function handleNotification(event) {
     let decoder = new TextDecoder();
     let chunk = decoder.decode(event.target.value);
-    partialData += chunk;
+    partialData += chunk;  // append chunk
 
+    // Log the data to check if it's coming through correctly
     console.log("Received Chunk:", chunk);
+    console.log("Partial Data:", partialData);
 
+    // Try to parse the full data if it's complete
     try {
-        // Try to parse the accumulated string
         let nodeData = JSON.parse(partialData);
+        console.log("Parsed Node Data:", nodeData);
 
-        // Validate structure
-        if (nodeData.nodes && Array.isArray(nodeData.nodes) &&
-            nodeData.edges && Array.isArray(nodeData.edges)) {
+        // Update the network graph with the parsed data
+        updateNetworkGraph(nodeData);
 
-            console.log("Valid JSON received:", nodeData);
-            updateNetworkGraph(nodeData);
-            partialData = "";  // Clear only after successful update
-        } else {
-            console.warn("JSON parsed but structure is invalid");
-        }
+        // Clear the partial data after successful parsing
+        partialData = ""; 
     } catch (error) {
-        // JSON still incomplete
-        console.log("Incomplete JSON, waiting for more data...");
+        // Still waiting for more data to form a complete JSON object
+        console.log("Waiting for full JSON data...");
     }
 
     let timestamp = new Date().toLocaleTimeString();
+    // Prepend the new received chunk at the top of the received messages section
     document.getElementById("receivedMessages").innerHTML = `<p><strong>[${timestamp}] Received Chunk:</strong> ${chunk}</p>` + document.getElementById("receivedMessages").innerHTML;
-
 }
 
 
-function updateNetworkGraph(data) {
-    // Ensure the data is in the correct format
-    console.log("Updating Network Graph with data:", data);
+        function updateNetworkGraph(data) {
+            // Ensure the data is in the correct format
+            console.log("Updating Network Graph with data:", data);
 
-    // Create nodes from the received data
-    let nodes = new vis.DataSet(data.nodes.map(node => ({
-        id: node.id,
-        label: node.label,
-        title: node.title // Add titles if neeF=ded
-    })));
+            // Create nodes from the received data
+            let nodes = new vis.DataSet(data.nodes.map(node => ({
+                id: node.id,
+                label: node.label,
+                title: node.title // Add titles if neeF=ded
+            })));
 
-    // Create edges from the received data
-    let edges = new vis.DataSet(data.edges.map(link => ({
-        from: link.from,
-        to: link.to,
-        label: link.label,
-        width: Math.max(1, link.snr / 2) // Optional: Adjust width based on SNR
-    })));
+            // Create edges from the received data
+            let edges = new vis.DataSet(data.edges.map(link => ({
+                from: link.from,
+                to: link.to,
+                label: link.label,
+                width: Math.max(1, link.snr / 2) // Optional: Adjust width based on SNR
+            })));
 
-    // Ensure the graph container exists
-    let container = document.getElementById("network");
+            // Ensure the graph container exists
+            let container = document.getElementById("network");
 
-    if (!network) {
-    let options = {
-        edges: {
-            arrows: { to: { enabled: false } },
-            color: { color: "#848484" },
-            smooth: true
-        },
-        physics: { enabled: true }
-    };
-    network = new vis.Network(container, { nodes, edges }, options);
-} else {
-    // Update the datasets without resetting the network
-    network.body.data.nodes.clear();
-    network.body.data.edges.clear();
-    network.body.data.nodes.add(data.nodes);
-    network.body.data.edges.add(data.edges);
-}
+            // Check if the network instance exists
+            if (!network) {
+                // If not, create a new network instance
+                let options = {
+                    edges: {
+                        arrows: { to: { enabled: false } },
+                        color: { color: "#848484" },
+                        smooth: true
+                    },
+                    physics: { enabled: true }
+                };
 
+                network = new vis.Network(container, { nodes, edges }, options);
+            } else {
+                // If network instance already exists, just update the data
+                network.setData({ nodes, edges });
+            }
 
-    // Update the destination node list
-    updateDestinationNodeList(data, ""); 
-}
+            // Update the destination node list
+            updateDestinationNodeList(data, "");
+        }
 
 
         function updateDestinationNodeList(data, selfNodeId) {
@@ -371,7 +369,7 @@ function updateNetworkGraph(data) {
                     { id: "Node3" },
                     { id: "Node4" }
                 ],
-                edges: [
+                connections: [
                     { from: "Node1", to: "Node2", snr: 10 },
                     { from: "Node2", to: "Node3", snr: 15 },
                     { from: "Node3", to: "Node4", snr: 20 },
@@ -406,4 +404,4 @@ function updateNetworkGraph(data) {
     </script>
 </body>
 
-</html> 
+</html>
