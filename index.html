@@ -250,19 +250,11 @@
                 alert("Please fill in all fields");
                 return;
             }*/
-            if (!destinationNode) {
-                alert("Please select a destination node");
-                return;
-            }
-            if (!message) {
-                alert("Please enter a message");
-                return;
-            }
-            
             let timestamp = new Date().toLocaleTimeString();
             let datestamp = new Date().toLocaleDateString('en-GB');
-            //let messageHeader = ` Number| ${number} |Place| ${place} |Station| ${station} |Precedence| ${precedence} |`;
-            const messageWithHeader = `${destinationNode}|${to}|Message|<b>${message}</b>|From|${from}|[${timestamp} ${datestamp}]|`;//${messageHeader}`;
+            let messageHeader = ` Number| ${number} |Place| ${place} |Station| ${station} |Precedence| ${precedence} |`;
+            const messageWithHeader = `${destinationNode}|${to}|Message|<b>${message}</b>|From|${from}|[${timestamp} ${datestamp}]|${messageHeader}`;
+
             let encoder = new TextEncoder();
             await bleCharacteristic.writeValue(encoder.encode(messageWithHeader));
 
