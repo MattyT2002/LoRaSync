@@ -254,12 +254,12 @@
             let datestamp = new Date().toLocaleDateString('en-GB');
             let messageHeader = ` Number| ${number} |Place| ${place} |Station| ${station} |Precedence| ${precedence} |`;
             const messageWithHeader = `${destinationNode}|${to}|Message|<b>${message}</b>|From|${from}|[${timestamp} ${datestamp}]|${messageHeader}`;
-
+            const simplifiedMessage = `${destinationNode}|Message|${message}`
             let encoder = new TextEncoder();
-            await bleCharacteristic.writeValue(encoder.encode(messageWithHeader));
+            await bleCharacteristic.writeValue(encoder.encode(simplifiedMessage));
 
             // Prepend the new message at the top of the sent messages section
-            document.getElementById("sentMessages").innerHTML = `<p><strong>[${timestamp}] Sent:</strong> ${messageWithHeader}</p>` + document.getElementById("sentMessages").innerHTML;
+            document.getElementById("sentMessages").innerHTML = `<p><strong>[${timestamp}] Sent:</strong> ${simplifiedMessage}</p>` + document.getElementById("sentMessages").innerHTML;
         });
 
 
