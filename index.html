@@ -274,53 +274,47 @@
         let partialData = "";
 
         function handleNotification(event) {
-    let decoder = new TextDecoder();
-    let chunk = decoder.decode(event.target.value);
-    partialData += chunk;  // append chunk
+            let decoder = new TextDecoder();
+            let chunk = decoder.decode(event.target.value);
+            partialData += chunk;  // append chunk
 
-    // Log the data to check if it's coming through correctly
-    console.log("Received Chunk:", chunk);
-    console.log("Partial Data:", partialData);
+            console.log("Received Chunk:", chunk);
+            console.log("Partial Data:", partialData);
 
-    // Try to parse the full data if it's complete
-    try {
-        let nodeData = JSON.parse(partialData);
-        console.log("Parsed Node Data:", nodeData);
+            // Try to parse the full data if it's complete
+            try {
+                let nodeData = JSON.parse(partialData);
+                console.log("Parsed Node Data:", nodeData);
 
-        // Update the network graph with the parsed data
-        updateNetworkGraph(nodeData);
+                // Update the network graph with the parsed data
+                updateNetworkGraph(nodeData);
 
-        // Clear the partial data after successful parsing
-        partialData = ""; 
-    } catch (error) {
-        // Still waiting for more data to form a complete JSON object
-        console.log("Waiting for full JSON data...");
-    }
+                // Clear the partial data after successful parsing
+                partialData = "";
+            } catch (error) {
+                // Still waiting for more data to form a complete JSON object
+                console.log("Waiting for full JSON data...");
+            }
 
-    let timestamp = new Date().toLocaleTimeString();
-    // Prepend the new received chunk at the top of the received messages section
-    document.getElementById("receivedMessages").innerHTML = `<p><strong>[${timestamp}] Received Chunk:</strong> ${chunk}</p>` + document.getElementById("receivedMessages").innerHTML;
-}
-
-
+            let timestamp = new Date().toLocaleTimeString();
+            document.getElementById("receivedMessages").innerHTML = `<p><strong>[${timestamp}] Received Chunk:</strong> ${chunk}</p>` + document.getElementById("receivedMessages").innerHTML;
+        }
         function updateNetworkGraph(data) {
-            // Ensure the data is in the correct format
-            console.log("Updating Network Graph with data:", data);
+            let nodes = new vis.DataSet();
+            let edges = new vis.DataSet();
 
-            // Create nodes from the received data
-            let nodes = new vis.DataSet(data.nodes.map(node => ({
-                id: node.id,
-                label: node.label,
-                title: node.title // Add titles if neeF=ded
-            })));
+            // Ensure nodes and edges are correctly extracted from the data
+            if (data.nodes && Array.isArray(data.nodes)) {
+                data.nodes.forEach(node => {
+                    nodes.add({ id: node.id, label: node.label });
+                });
+            }
 
-            // Create edges from the received data
-            let edges = new vis.DataSet(data.edges.map(link => ({
-                from: link.from,
-                to: link.to,
-                label: link.label,
-                width: Math.max(1, link.snr / 2) // Optional: Adjust width based on SNR
-            })));
+            if (data.edges && Array.isArray(data.edges)) {
+                data.edges.forEach(edge => {
+                    edges.add({ from: edge.from, to: edge.to, label: edge.label, width: edge.width });
+                });
+            }
 
             // Ensure the graph container exists
             let container = document.getElementById("network");
@@ -351,6 +345,8 @@
         function updateDestinationNodeList(data, selfNodeId) {
             const destinationNodeSelect = document.getElementById("destinationNode");
             destinationNodeSelect.innerHTML = '<option value="" disabled selected>Select a node</option>';
+
+            // Iterate through nodes and add them to the dropdown
             data.nodes.forEach(node => {
                 if (node.id !== selfNodeId) {
                     const option = document.createElement("option");
@@ -359,6 +355,17 @@
                     destinationNodeSelect.appendChild(option);
                 }
             });
+        }
+
+        // Helper function to find the SNR value for a given node from the connections
+        function getSNRForNode(nodeId, connections) {
+            let snrValue = 'N/A';
+            connections.forEach(connection => {
+                if (connection.from === nodeId || connection.to === nodeId) {
+                    snrValue = connection.snr;
+                }
+            });
+            return snrValue;
         }
 
         document.getElementById("loadTestData").addEventListener("click", () => {
